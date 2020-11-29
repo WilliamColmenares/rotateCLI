@@ -1,0 +1,68 @@
+#!/usr/bin/python3
+import argparse
+import math
+import sys
+
+import cv2
+from statistics import median
+from imutils import rotate_bound
+
+VERSION = '0.0.1'
+
+class rotateCLI:
+    def __init__(self):
+        self._init_parser()
+    
+    @classmethod
+    def _init_parser(cls):
+        cls.parser = argparse.ArgumentParser(description='rotate ' + VERSION)
+        cls.parser.add_argument('-V', '--version', help='Show version.', action='version', version=VERSION)
+        cls.parser.add_argument('-i' ,'--image', metavar='image_path')
+    
+    def _img_check(self, args):
+        """
+        Converts the image to grayscale, detects borders a
+        and applies rotation based on its angles
+        """
+        img = cv2.imread(args.image)
+        if img is not None:
+            img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img_edges = cv2.Canny(img_gray, 50, 150, apertureSize = 3)
+
+            # Draw lines based on the detected edges
+            lines = cv2.HoughLinesP(img_edges, 1, math.pi / 180, 100, minLineLength=100, maxLineGap=100)
+            
+            img_rotated = rotate_bound(img, self._get_degrees(lines))
+            # Just shows the image and doesn't write it to the disk. 
+            cv2.imshow("Press any key to close this view", img_rotated)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        else:
+            print("no valid image found.")
+    
+    @staticmethod
+    def _get_degrees(lines):
+        """
+        Detects lines angle and returns the rotation needed to align it vertically
+        FIXME The default rotation is counterclockwise.
+        """
+        angles = []
+
+        for coords in lines:
+            for [x1, y1, x2, y2] in coords.tolist():
+                # Collets coords and applies a counterclockwise rotation (so its vertically aligned).
+                angle = math.degrees(math.atan2(x1 - x2, y1 - y2))
+                angles.append(angle)
+
+        return median(angles)
+        
+    def commandline(self):
+        args = self.parser.parse_args()
+        if args.image is not None:
+            self._img_check(args)
+        else:
+            self.parser.print_help()
+
+if __name__ == "__main__":
+    cli = rotateCLI()
+    cli.commandline()
